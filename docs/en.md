@@ -1,61 +1,148 @@
-# Demo Devices Template
+# KNMI
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+The official weather of the **Netherlands** in Gladys: the observations, forecasts and **warnings of
+the KNMI** (Koninklijk Nederlands Meteorologisch Instituut), read through the free
+[Weerlive.nl](https://weerlive.nl) API. Made for the Dutch living in France, for people near the
+Belgian–Dutch border, and for anyone with a house in the Netherlands.
 
-## What you get
+> **Developed without a Weerlive account: feedback welcome.** The integration is built and tested
+> against real Weerlive answers (published by the python-weerlive and ha-knmi projects), not
+> against the live service. Please report what works and what does not in the
+> [issues](https://github.com/guim31/gladys-knmi/issues).
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+This integration is not affiliated with KNMI nor with Weerlive.
+
+## Presentation
+
+- **One device per place**: a Gladys house (its location), Dutch towns or coordinates, five places
+  at most.
+- Each device shows the temperature, the feels-like temperature, humidity, air pressure, wind
+  (Beaufort, km/h and direction), visibility, the precipitation forecast for the coming hour, the
+  conditions, sunrise and sunset, and the **KNMI warning**: its colour (green, yellow, orange, red),
+  its title and text, and the next warning announced.
+- A **scene trigger** _New KNMI warning_, with the KNMI text ready for a notification.
+- A **dashboard widget** _KNMI forecast_: live values, warnings, sun and the 5-day forecast.
+- Read-only: nothing can be controlled.
+
+## Prerequisites
+
+- Gladys Assistant **5.2.0** or later (house picker in the configuration, widgets, scene
+  triggers).
+- A **free Weerlive API key**: fill in the form on
+  [weerlive.nl/delen.php](https://weerlive.nl/delen.php) with your email address; the key arrives
+  by email. Weerlive reserves the free key for personal and hobby use.
+- Internet access for Gladys (the integration calls `weerlive.nl`).
+- The install screen asks for access to the **location of your houses**: it is only used for the
+  house you pick in the configuration.
 
 ## Configuration
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+Open **Integrations → KNMI → Configuration**.
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+### Weerlive API key
 
-## Actions
+Paste the key received by email. It is stored in the Gladys configuration, never in the logs.
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+### Places
 
-## Scenes
+- **Gladys house**: follow the weather at the location of this house (set in Settings → Houses).
+  The coordinates are sent to Weerlive rounded to two decimals, about 1 km.
+- **Other places**: Dutch towns (`Amsterdam`, `'s-Hertogenbosch`) or coordinates
+  (`52.09,5.12`), separated by semicolons. Weerlive picks the nearest station: the _Test the
+  connection_ button tells you which place it found.
+- Five places at most, house included.
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+Then open the **Discovery** tab and add the devices you want: only the added devices are read.
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+### Refresh and quota
 
-## Dashboard
+The free key allows **300 requests a day**, and Weerlive refreshes its data every 10 minutes. The
+integration reads each added place every 10 minutes at most (the _Refresh interval_ field), and
+slows down by itself with several places so that all of them stay under 240 requests a day: 12
+minutes with two places, 18 with three, 30 with five. The last reading is kept in `/data`, so a
+restart of Gladys does not spend the quota again, and showing the widget never makes a request.
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+### Language
+
+_Language of the texts_ (French by default) names the features of new devices and writes the
+conditions and dates. Feature names are fixed when a device is added. The KNMI warning texts stay
+in Dutch, as the KNMI writes them.
+
+## Devices
+
+Every feature is read-only.
+
+| Feature                    | Value                                                      |
+| -------------------------- | ---------------------------------------------------------- |
+| Temperature, feels like    | °C                                                         |
+| Humidity                   | %                                                          |
+| Air pressure               | hPa                                                        |
+| Wind (Beaufort)            | 0 to 12                                                    |
+| Wind speed                 | km/h                                                       |
+| Wind direction             | degrees (0 = from the north, 90 = from the east)           |
+| Visibility                 | km                                                         |
+| Precipitation, coming hour | mm forecast for the hour in progress                       |
+| Conditions                 | sunny, cloudy, showers… in the chosen language             |
+| Sunrise, sunset            | local time of the Netherlands (same as France and Belgium) |
+| KNMI warning level         | 0 green, 1 yellow, 2 orange, 3 red                         |
+| KNMI warning, text         | title and text of the KNMI, in Dutch                       |
+| Weather alarm              | 1 when Weerlive flags a weather alarm for the region       |
+| Next KNMI warning level    | colour of the next warning announced (0 when none)         |
+| Next KNMI warning from     | its start, or "None"                                       |
+
+## Widget
+
+Add the **KNMI forecast** widget to a dashboard and pick a place. It shows the place and the
+current conditions, three live tiles (temperature, feels like, wind), the 5-day forecast (minimum
+and maximum, chance of rain, wind), the warning in force and the next one with their colours,
+sunrise and sunset, and the Dutch KNMI text when a warning is in force. It is built from the last
+reading: it costs no request.
+
+## Scene trigger
+
+**New KNMI warning** fires once per new warning:
+
+- _In force now_: a yellow, orange or red warning starts for the place, or another warning
+  replaces it;
+- _Announced for later_: the KNMI announces a warning starting later, the first time this colour
+  and start are seen.
+
+Filters: the place, the colours, when. Variables for the actions: `place`, `level` (`yellow`,
+`orange`, `red`), `level_number` (1 to 3), `phase` (`current`, `upcoming`), `title` and `text` (in
+Dutch, for a warning in force), `starts_at` (ISO date). The first reading after the installation
+only records what is in force, and a restart never fires the same warning twice. The end of a
+warning is not an event: use the _KNMI warning level_ feature (`= 0`).
+
+## Configuration action
+
+**Test the connection** reads the first place once (one request of the quota) and tells you
+whether the key is accepted, which place Weerlive found, how many requests are left today and the
+pace of the readings.
+
+## Scene examples
+
+- **Storm warning**: trigger _New KNMI warning_, colours orange and red, _In force now_ → send a
+  message "KNMI {{triggerEvent.data.level}} warning: {{triggerEvent.data.title}}".
+- **Close the awnings**: trigger _Device state_ on _Wind (Beaufort)_ of your house, ≥ 6 → close the
+  awnings or the shutters.
+- **The night before**: trigger _New KNMI warning_, _Announced for later_ → a notification with
+  `starts_at`, to bring the garden furniture in.
 
 ## Troubleshooting
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+- **"Weerlive refused the API key"**: check the key received by email, without spaces.
+- **"Daily Weerlive limit reached"**: the readings resume after midnight, Dutch time. Fewer places
+  or a longer interval help; the _Test_ button also spends one request.
+- **"Weerlive does not answer"**: an outage of the service or of the Internet access of Gladys.
+  The readings resume by themselves.
+- **No value on a device**: check that the device was added in the Discovery tab.
+- **Odd place**: Weerlive takes the nearest station; type another town or coordinates.
+- More details: set `LOG_LEVEL=debug` on the container and read its logs.
+
+## Limits
+
+- The data covers the Netherlands: a place far from it gets the nearest Dutch station, or nothing.
+- The warning texts are in Dutch, as the KNMI publishes them.
+- At most five places per key, and a reading every 10 minutes at best.
+- Weerlive says its free key is for personal and hobby use.
+- Developed without a Weerlive account, tested on real published answers.

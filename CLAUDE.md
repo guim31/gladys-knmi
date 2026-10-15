@@ -31,16 +31,22 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
-src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
+index.js                          SDK wiring only: registerHandlers() then connect()
+src/app.js                        KnmiApp: places, refresh tick, quota, states, trigger, widget, action
+src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults), places, pace
+src/weerlive.js                   Weerlive API v2 client (typed errors, never the key)
+src/model.js                      raw answer -> values; KNMI colours (groen/geel/oranje/rood -> 0-3)
+src/device.js                     one device per place: features (keys are forever) and states
+src/warnings.js                   "knmi_warning" scene trigger: what is new since the last reading
+src/widgets.js                    "knmi_forecast" dashboard widget (built from the last reading)
+src/i18n.js                       every text produced by the container, en / fr / de / es
+src/store.js                      /data/knmi-state.json: last readings, last warnings seen
+src/issues.js                     repeated failures logged once
+scripts/probe.mjs                 real API probe (fake key -> refusal), prints nothing sensitive
 gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (same sections)
+test/                             node --test, SDK fake Gladys + fake Weerlive (test/helpers/world.js)
+test/fixtures/weerlive/           verbatim API answers (python-weerlive, MIT), prettier-ignored
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,8 +76,10 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in four languages (English, French, German with
+  "du", Spanish with "usted"): action messages, manifest texts, feature names,
+  widget texts, and `docs/en.md`, `fr.md`, `de.md`, `es.md`, kept in sync with
+  the same sections. `test/i18n.test.js` enforces it.
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -233,3 +241,49 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## Intégration KNMI (Weerlive)
+
+**API.** Une seule requête par lieu : `https://weerlive.nl/api/weerlive_api_v2.php?key=…&locatie=…`
+(`locatie` = nom de ville ou `lat,lon`). Réponse : `liveweer[0]` (observation, avertissement),
+`uur_verw` (24 h), `wk_verw` (5 jours), `api[0]` (`max_verz` 300, `rest_verz`). Weerlive rafraîchit
+toutes les 10 min ; la clé gratuite (usage personnel et loisir) permet 300 requêtes par jour.
+L'API est **injoignable depuis les sessions de code** (proxy 403) : tout est testé sur les réponses
+publiées de python-weerlive ; `scripts/probe.mjs` est à lancer par l'orchestrateur.
+
+**Pièges de l'API**
+
+- Clé refusée et limite quotidienne arrivent en **HTTP 200** avec une phrase néerlandaise au lieu du
+  JSON : « Vraag eerst een API-key op », « Dagelijkse limiet ».
+- Une valeur manquante est parfois un `_` nu, **JSON invalide** (`"luchtd": _,`) : lu comme `null`,
+  seule la fonctionnalité concernée est sautée. Les autres absences valent `"-"`.
+- `rest_verz` n'est pas fiable (0 sur une réponse normale, -16814 dans une autre) : il ne sert qu'à
+  l'information, seule la phrase « Dagelijkse limiet » met en pause, jusqu'à 00:05 heure
+  d'Amsterdam.
+- `alarm: 1` peut coexister avec `wrschklr: "groen"` : l'alarme Weerlive n'est pas le code KNMI. Les
+  deux sont publiés séparément.
+- `lkop`/`ltekst` (titre et texte de l'avertissement) sont **en néerlandais seulement** et `ltekst`
+  commence parfois par une espace. Publiés tels quels (tronqués à 500), jamais traduits.
+- `wolkennacht` est un code d'image non documenté mais présent dans les réponses réelles.
+- `sup`/`sunder` sont en heure locale néerlandaise (« 07:57 »), publiés en texte.
+- L'URL contient la clé : ne jamais logger l'URL ni la mettre dans un message d'erreur
+  (`WeerliveError` n'en contient jamais).
+
+**Choix de conception**
+
+- Le conteneur se rafraîchit seul : tick d'une minute, un lieu est relu quand sa dernière lecture a
+  une période. Période = intervalle configuré, ralenti pour rester sous 240 requêtes/jour
+  (`effectiveMinutes`). `onPoll` (60 s, repli) suit la même règle : jamais de requête en plus.
+- Dernière lecture par lieu gardée dans `/data` : un redémarrage ne relit pas un lieu lu il y a
+  5 min ; le widget est construit sur cette lecture, sans requête.
+- Seuls les appareils ajoutés sont lus, sauf une lecture de vérification de la clé quand aucun ne
+  l'est (gardée pour l'ajout).
+- Identifiants : `place:house-<selector>`, `place:city-<slug>`, `place:geo-<lat>_<lon>` (2 décimales).
+  La maison garde son id si sa position change.
+- Coordonnées de maison arrondies à 2 décimales (≈ 1 km) avant envoi : `location: true` est demandé
+  pour `getHouses()`, `source: "houses"` impose `gladys_version >= 5.2.0`.
+- Déclencheur `knmi_warning` : `current` quand le niveau monte ou que le titre change à niveau ≥ 1,
+  `upcoming` quand `wrsch_gc`/`wrsch_gts` change avec une couleur ≥ jaune. La première lecture
+  d'un lieu n'émet rien ; l'état vu est persistant.
+- Action de config `test_connection` : coûte une requête du quota, le dire.
+- Le résultat d'une action est relayé sous `data.message` par le faux Gladys du SDK.

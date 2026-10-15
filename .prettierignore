@@ -2,3 +2,5 @@ node_modules/
 package-lock.json
 /data/
 *.log
+# Verbatim API answers (one is not even valid JSON, on purpose)
+test/fixtures/weerlive/

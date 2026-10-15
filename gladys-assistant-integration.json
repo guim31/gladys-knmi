@@ -1,177 +1,447 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "KNMI",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Official Dutch weather (KNMI via Weerlive): observations, forecasts and KNMI warnings.",
+    "fr": "Météo officielle néerlandaise (KNMI via Weerlive) : relevés, prévisions et avertissements.",
+    "de": "Offizielles niederländisches Wetter (KNMI über Weerlive): Messwerte, Vorhersagen, Warnungen.",
+    "es": "Tiempo oficial neerlandés (KNMI vía Weerlive): observaciones, previsiones y avisos KNMI."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
-  "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "docker_image": "ghcr.io/guim31/gladys-knmi:1.0.0",
+  "gladys_version": ">=5.2.0",
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-knmi/main/cover.png",
+  "categories": ["environment"],
+  "transports": ["cloud"],
+  "location": true,
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Getting started",
+        "fr": "Pour commencer",
+        "de": "Erste Schritte",
+        "es": "Primeros pasos"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "The weather comes from the KNMI through the Weerlive.nl API. Ask for a free API key on weerlive.nl (an email address is enough): it allows 300 requests a day, so each place is read every 10 minutes at most, slower with several places. Not affiliated with KNMI or Weerlive.",
+        "fr": "La météo vient du KNMI par l’API Weerlive.nl. Demandez une clé d’API gratuite sur weerlive.nl (une adresse e-mail suffit) : elle permet 300 requêtes par jour, chaque lieu est donc lu toutes les 10 minutes au plus, moins souvent avec plusieurs lieux. Sans lien avec le KNMI ni Weerlive.",
+        "de": "Das Wetter kommt vom KNMI über die API von Weerlive.nl. Beantrage auf weerlive.nl einen kostenlosen API-Schlüssel (eine E-Mail-Adresse genügt): Er erlaubt 300 Anfragen pro Tag, daher wird jeder Ort höchstens alle 10 Minuten gelesen, bei mehreren Orten seltener. Keine Verbindung zu KNMI oder Weerlive.",
+        "es": "El tiempo procede del KNMI a través de la API de Weerlive.nl. Solicite una clave de API gratuita en weerlive.nl (basta con una dirección de correo): permite 300 solicitudes al día, así que cada lugar se lee como mucho cada 10 minutos, con menos frecuencia si hay varios lugares. Sin relación con el KNMI ni con Weerlive."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://weerlive.nl/delen.php",
+          "label": {
+            "en": "Get a free Weerlive key",
+            "fr": "Obtenir une clé Weerlive gratuite",
+            "de": "Kostenlosen Weerlive-Schlüssel holen",
+            "es": "Obtener una clave gratuita de Weerlive"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+      "key": "api_key",
+      "type": "secret",
+      "label": {
+        "en": "Weerlive API key",
+        "fr": "Clé d’API Weerlive",
+        "de": "Weerlive-API-Schlüssel",
+        "es": "Clave de API de Weerlive"
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "description": {
+        "en": "The key received by email from weerlive.nl.",
+        "fr": "La clé reçue par e-mail de weerlive.nl.",
+        "de": "Der Schlüssel, den du per E-Mail von weerlive.nl bekommen hast.",
+        "es": "La clave recibida por correo electrónico de weerlive.nl."
+      },
+      "required": true
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
+      "key": "house",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "source": "houses",
+      "label": {
+        "en": "Gladys house",
+        "fr": "Maison Gladys",
+        "de": "Gladys-Haus",
+        "es": "Casa de Gladys"
+      },
+      "description": {
+        "en": "Follow the weather at the location of this house (sent to Weerlive rounded to about 1 km).",
+        "fr": "Suivre la météo à la position de cette maison (envoyée à Weerlive arrondie à 1 km environ).",
+        "de": "Das Wetter am Standort dieses Hauses verfolgen (an Weerlive auf etwa 1 km gerundet gesendet).",
+        "es": "Seguir el tiempo en la ubicación de esta casa (enviada a Weerlive redondeada a 1 km aprox.)."
+      },
+      "required": false
+    },
+    {
+      "key": "places",
+      "type": "string",
+      "label": {
+        "en": "Other places",
+        "fr": "Autres lieux",
+        "de": "Weitere Orte",
+        "es": "Otros lugares"
+      },
+      "description": {
+        "en": "Dutch towns or \"latitude,longitude\", separated by semicolons. Five places at most, house included.",
+        "fr": "Villes néerlandaises ou « latitude,longitude », séparées par des points-virgules. Cinq lieux au plus, maison comprise.",
+        "de": "Niederländische Orte oder „Breitengrad,Längengrad“, durch Semikolons getrennt. Höchstens fünf Orte, Haus inklusive.",
+        "es": "Ciudades neerlandesas o «latitud,longitud», separadas por punto y coma. Cinco lugares como máximo, casa incluida."
+      },
+      "placeholder": {
+        "en": "e.g. Amsterdam; Maastricht",
+        "fr": "ex. Amsterdam; Maastricht",
+        "de": "z. B. Amsterdam; Maastricht",
+        "es": "p. ej. Amsterdam; Maastricht"
+      },
+      "required": false
+    },
+    {
+      "key": "refresh_minutes",
+      "type": "select",
+      "label": {
+        "en": "Refresh interval",
+        "fr": "Intervalle de rafraîchissement",
+        "de": "Aktualisierungsintervall",
+        "es": "Intervalo de actualización"
+      },
+      "description": {
+        "en": "Slowed down automatically with several places, to stay within the 300 daily requests.",
+        "fr": "Ralenti automatiquement avec plusieurs lieux, pour rester dans les 300 requêtes par jour.",
+        "de": "Wird bei mehreren Orten automatisch verlangsamt, um unter 300 Anfragen pro Tag zu bleiben.",
+        "es": "Se ralentiza automáticamente con varios lugares, para no superar las 300 solicitudes diarias."
+      },
       "required": false,
-      "default": "celsius",
+      "default": "10",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "10",
+          "label": {
+            "en": "10 minutes",
+            "fr": "10 minutes",
+            "de": "10 Minuten",
+            "es": "10 minutos"
+          }
+        },
+        {
+          "value": "15",
+          "label": {
+            "en": "15 minutes",
+            "fr": "15 minutes",
+            "de": "15 Minuten",
+            "es": "15 minutos"
+          }
+        },
+        {
+          "value": "20",
+          "label": {
+            "en": "20 minutes",
+            "fr": "20 minutes",
+            "de": "20 Minuten",
+            "es": "20 minutos"
+          }
+        },
+        {
+          "value": "30",
+          "label": {
+            "en": "30 minutes",
+            "fr": "30 minutes",
+            "de": "30 Minuten",
+            "es": "30 minutos"
+          }
+        },
+        {
+          "value": "60",
+          "label": {
+            "en": "60 minutes",
+            "fr": "60 minutes",
+            "de": "60 Minuten",
+            "es": "60 minutos"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the texts",
+        "fr": "Langue des textes",
+        "de": "Sprache der Texte",
+        "es": "Idioma de los textos"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "Feature names of new devices, conditions and dates. The KNMI warning texts stay in Dutch.",
+        "fr": "Noms des fonctionnalités des nouveaux appareils, conditions et dates. Les textes d’avertissement du KNMI restent en néerlandais.",
+        "de": "Funktionsnamen neuer Geräte, Wetterlage und Daten. Die Warntexte des KNMI bleiben auf Niederländisch.",
+        "es": "Nombres de las funciones de los nuevos dispositivos, condiciones y fechas. Los textos de aviso del KNMI siguen en neerlandés."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": "fr",
+      "options": [
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
+      "key": "test_connection",
+      "label": {
+        "en": "Test the connection",
+        "fr": "Tester la connexion",
+        "de": "Verbindung testen",
+        "es": "Probar la conexión"
+      },
+      "description": {
+        "en": "Reads the first place once (one request of the daily quota).",
+        "fr": "Lit le premier lieu une fois (une requête du quota quotidien).",
+        "de": "Liest den ersten Ort einmal (eine Anfrage des Tageskontingents).",
+        "es": "Lee el primer lugar una vez (una solicitud de la cuota diaria)."
+      },
+      "timeout_seconds": 20
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "knmi_warning",
+      "label": {
+        "en": "New KNMI warning",
+        "fr": "Nouvel avertissement KNMI",
+        "de": "Neue KNMI-Warnung",
+        "es": "Nuevo aviso KNMI"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "A yellow, orange or red KNMI warning is now in force, or announced for later.",
+        "fr": "Un avertissement KNMI jaune, orange ou rouge est en vigueur, ou annoncé pour plus tard.",
+        "de": "Eine gelbe, orange oder rote KNMI-Warnung gilt jetzt oder ist für später angekündigt.",
+        "es": "Un aviso KNMI amarillo, naranja o rojo está en vigor, o anunciado para más tarde."
       },
       "fields": [
         {
           "key": "device",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+          "label": {
+            "en": "KNMI place",
+            "fr": "Lieu KNMI",
+            "de": "KNMI-Ort",
+            "es": "Lugar KNMI"
+          }
         },
         {
-          "key": "target",
+          "key": "level",
           "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
+          "label": {
+            "en": "Colour",
+            "fr": "Couleur",
+            "de": "Farbe",
+            "es": "Color"
+          },
           "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
+            {
+              "value": "yellow",
+              "label": {
+                "en": "Yellow",
+                "fr": "Jaune",
+                "de": "Gelb",
+                "es": "Amarillo"
+              }
+            },
+            {
+              "value": "orange",
+              "label": {
+                "en": "Orange",
+                "fr": "Orange",
+                "de": "Orange",
+                "es": "Naranja"
+              }
+            },
+            {
+              "value": "red",
+              "label": {
+                "en": "Red",
+                "fr": "Rouge",
+                "de": "Rot",
+                "es": "Rojo"
+              }
+            }
+          ]
+        },
+        {
+          "key": "phase",
+          "type": "select",
+          "label": {
+            "en": "When",
+            "fr": "Quand",
+            "de": "Wann",
+            "es": "Cuándo"
+          },
+          "options": [
+            {
+              "value": "current",
+              "label": {
+                "en": "In force now",
+                "fr": "En vigueur",
+                "de": "Jetzt gültig",
+                "es": "En vigor"
+              }
+            },
+            {
+              "value": "upcoming",
+              "label": {
+                "en": "Announced for later",
+                "fr": "Annoncé pour plus tard",
+                "de": "Für später angekündigt",
+                "es": "Anunciado para más tarde"
+              }
+            }
           ]
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "place",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
-        }
-      ]
-    }
-  ],
-  "scene_actions": [
-    {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
-      },
-      "timeout_seconds": 15,
-      "fields": [
+          "label": {
+            "en": "Place",
+            "fr": "Lieu",
+            "de": "Ort",
+            "es": "Lugar"
+          }
+        },
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ],
-      "outputs": [
+          "key": "level",
+          "type": "string",
+          "label": {
+            "en": "Colour (yellow, orange, red)",
+            "fr": "Couleur (yellow, orange, red)",
+            "de": "Farbe (yellow, orange, red)",
+            "es": "Color (yellow, orange, red)"
+          }
+        },
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "level_number",
+          "type": "number",
+          "label": {
+            "en": "Level (1 to 3)",
+            "fr": "Niveau (1 à 3)",
+            "de": "Stufe (1 bis 3)",
+            "es": "Nivel (1 a 3)"
+          }
+        },
+        {
+          "key": "phase",
+          "type": "string",
+          "label": {
+            "en": "When (current, upcoming)",
+            "fr": "Quand (current, upcoming)",
+            "de": "Wann (current, upcoming)",
+            "es": "Cuándo (current, upcoming)"
+          }
+        },
+        {
+          "key": "title",
+          "type": "string",
+          "label": {
+            "en": "KNMI title (Dutch)",
+            "fr": "Titre KNMI (néerlandais)",
+            "de": "KNMI-Titel (Niederländisch)",
+            "es": "Título KNMI (neerlandés)"
+          }
+        },
+        {
+          "key": "text",
+          "type": "string",
+          "label": {
+            "en": "KNMI text (Dutch)",
+            "fr": "Texte KNMI (néerlandais)",
+            "de": "KNMI-Text (Niederländisch)",
+            "es": "Texto KNMI (neerlandés)"
+          }
+        },
+        {
+          "key": "starts_at",
+          "type": "string",
+          "label": {
+            "en": "Start (ISO date)",
+            "fr": "Début (date ISO)",
+            "de": "Beginn (ISO-Datum)",
+            "es": "Inicio (fecha ISO)"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "knmi_forecast",
+      "label": {
+        "en": "KNMI forecast",
+        "fr": "Prévisions KNMI",
+        "de": "KNMI-Vorhersage",
+        "es": "Previsión KNMI"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "Live weather, KNMI warning in force and next one, sun, and the 5-day forecast.",
+        "fr": "Météo en direct, avertissement KNMI en cours et suivant, soleil, prévisions à 5 jours.",
+        "de": "Aktuelles Wetter, gültige und nächste KNMI-Warnung, Sonne und 5-Tage-Vorhersage.",
+        "es": "Tiempo actual, aviso KNMI vigente y próximo, sol y previsión a 5 días."
+      },
+      "icon": "cloud",
+      "settings": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "KNMI place",
+            "fr": "Lieu KNMI",
+            "de": "KNMI-Ort",
+            "es": "Lugar KNMI"
+          },
+          "required": true
+        }
+      ]
     }
   ]
 }
