@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-15
+
 ### Added
 
 - The official weather of the Netherlands from the KNMI, through the free
@@ -30,4 +32,5 @@ the notes of the version's GitHub Release.
   when the daily limit is reached; keeps the last reading across restarts.
 - Texts and documentation in English, French, German and Spanish.
 
-[Unreleased]: https://github.com/guim31/gladys-knmi/commits/main
+[Unreleased]: https://github.com/guim31/gladys-knmi/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/guim31/gladys-knmi/releases/tag/v1.0.1
