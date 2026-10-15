@@ -1,77 +1,94 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateWidgetContent } from '@gladysassistant/integration-sdk';
-import { createFakeGladys } from '@gladysassistant/integration-sdk/testing';
-import { buildDiscoveredDevices } from '../src/devices/index.js';
-import { simulateLanSession } from '../src/devices/plug.js';
-import { DEMO_STATUS_WIDGET, WIDGETS, refreshWidgets } from '../src/widgets.js';
-import { normalizeConfig } from '../src/config.js';
+import { buildForecastContent } from '../src/widgets.js';
+import { toModel } from '../src/model.js';
+import { API_KEY, createAll, createWorld, document, withWarning } from './helpers/world.js';
 
-const gladys = createFakeGladys();
-const config = normalizeConfig();
-const demoStatus = WIDGETS[DEMO_STATUS_WIDGET];
+const DEVICE = 'ext:test-integration:place:city-amsterdam';
 
-// What the SDK passes to onWidgetGet, plus the config index.js adds.
-const getContent = (cfg = config) =>
-  demoStatus.get(gladys, { settings: {}, language: 'en', units: 'metric', config: cfg });
+const content = (doc, language = 'en') =>
+  buildForecastContent({
+    deviceExternalId: DEVICE,
+    label: 'Amsterdam',
+    model: toModel(doc, 0),
+    language,
+  });
 
-test('the demo_status content is rendered exactly as sent', async () => {
-  // [] = nothing the core would drop, truncate or trim to the content budget.
-  assert.deepEqual(validateWidgetContent(await getContent()), []);
-});
-
-test('the degraded plug connection content is valid too', async () => {
-  simulateLanSession(false);
-  try {
-    const content = await getContent();
-    assert.deepEqual(validateWidgetContent(content), []);
-    const status = content.components.find((component) => component.type === 'status');
-    assert.ok(
-      status.items.some((item) => item.color === 'warning'),
-      'degraded shows a warning',
-    );
-  } finally {
-    simulateLanSession(true);
+test('the forecast fits the core vocabulary and budget, in every language and case', () => {
+  const cases = [
+    document('amsterdam'),
+    document('alarm'),
+    withWarning('alarm', { wrschklr: 'rood', lkop: 'Code rood', ltekst: 'x'.repeat(900) }),
+    { liveweer: [{}], wk_verw: [], uur_verw: [] },
+  ];
+  for (const doc of cases) {
+    for (const language of ['en', 'fr', 'de', 'es']) {
+      assert.deepEqual(validateWidgetContent(content(doc, language)), [], language);
+    }
   }
 });
 
-test('the live tiles reference features the integration publishes', async () => {
-  const featureIds = new Set(
-    buildDiscoveredDevices(gladys, config).flatMap((device) =>
-      device.features.map((feature) => feature.external_id),
-    ),
+test('the forecast: live tiles, the warnings, the sun and five days', () => {
+  const { components } = content(document('alarm'), 'fr');
+  assert.deepEqual(
+    components.map((component) => component.type),
+    ['text', 'value', 'value', 'value', 'card-list', 'status', 'text'],
   );
-  const liveTiles = (await getContent()).components.filter((c) => c.device_feature);
-  assert.ok(liveTiles.length > 0, 'the template demonstrates a device-bound tile');
-  for (const tile of liveTiles) {
-    assert.ok(featureIds.has(tile.device_feature), `unknown feature ${tile.device_feature}`);
-  }
-});
-
-test('every button action of the content is handled and answers a short toast', async () => {
-  const buttons = (await getContent()).components.filter((c) => c.type === 'button' && c.action);
-  assert.ok(buttons.length > 0, 'the template demonstrates a widget action');
-  for (const { action } of buttons) {
-    const message = await demoStatus.action(gladys, {
-      actionKey: action.key,
-      params: action.params ?? {},
-      settings: {},
-      config,
-    });
-    assert.ok(message.en, 'the toast carries at least the mandatory `en` text');
-    assert.ok(message.en.length <= 200, 'toasts are capped at 200 characters');
-  }
-});
-
-test('an unknown widget action fails, so the user sees the error', async () => {
-  await assert.rejects(
-    demoStatus.action(gladys, { actionKey: 'unknown', params: {}, settings: {}, config }),
-    /Unknown widget action/,
+  assert.equal(components[0].text, 'Amsterdam · Nuit nuageuse');
+  const status = components.find((component) => component.type === 'status');
+  assert.deepEqual(
+    status.items.map((item) => [item.label, item.color]),
+    [
+      ['Avertissement en cours', 'success'],
+      ['Prochain avertissement', 'warning'],
+      ['Soleil', undefined],
+    ],
   );
+  assert.match(status.items[1].value, /^Jaune · jeu/);
+  const days = components.find((component) => component.type === 'card-list');
+  assert.equal(days.items.length, 5);
+  assert.match(days.items[0].title, /^mer\.? 14\/02 · Nuageux$/);
+  assert.equal(days.items[0].subtitle, '10° / 10° · Pluie 0 % · Vent SO 4 Bft');
+  assert.match(components.at(-1).text, /^Vanavond \(zeer\) zware windstoten\n/);
 });
 
-test('refreshWidgets nudges every widget', () => {
-  const fresh = createFakeGladys();
-  refreshWidgets(fresh);
-  assert.deepEqual(fresh.fake.widgetRefreshes, Object.keys(WIDGETS));
+test('no warning, no KNMI text', () => {
+  const { components } = content(document('amsterdam'));
+  assert.equal(components.filter((component) => component.type === 'text').length, 1);
+});
+
+test('the live tiles point at features of the device', async () => {
+  const world = await createWorld();
+  const [device] = world.gladys.fake.discoveredDevices;
+  const ids = new Set(device.features.map((feature) => feature.external_id));
+  const tiles = content(document('amsterdam')).components.filter((c) => c.device_feature);
+  assert.equal(tiles.length, 3);
+  for (const tile of tiles) {
+    assert.ok(ids.has(tile.device_feature), tile.device_feature);
+  }
+});
+
+test('the widget is served from the last reading, without a request', async () => {
+  const world = await createWorld({
+    config: { api_key: API_KEY, places: 'Amsterdam', language: 'de' },
+  });
+  await createAll(world);
+  const calls = world.weerlive.calls.length;
+
+  const get = async (settings, language) =>
+    (await world.gladys.fake.widgetGet('knmi_forecast', { settings, language })).data.content;
+  const forecast = await get({ device: DEVICE }, 'es');
+  assert.equal(forecast.components[0].text, 'Amsterdam · Nublado');
+  assert.equal(world.weerlive.calls.length, calls);
+
+  assert.match((await get({}, 'de')).components[0].text, /Wähle in den Widget-Einstellungen/);
+  assert.match(
+    (await get({ device: 'ext:test-integration:place:gone' }, 'fr')).components[0].text,
+    /plus configuré/,
+  );
+
+  await world.gladys.fake.configUpdated({ api_key: API_KEY, places: 'Amsterdam; Utrecht' });
+  const waiting = await get({ device: 'ext:test-integration:place:city-utrecht' }, 'en');
+  assert.match(waiting.components[0].text, /Waiting for the first KNMI reading/);
 });

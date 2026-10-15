@@ -30,6 +30,21 @@ Gladys before reporting a problem.
 
 In scope: the code of this repository and the Docker image it publishes.
 
+What the integration handles:
+
+- **The Weerlive API key** lives in the Gladys configuration (a `secret`
+  field). It is sent only to `weerlive.nl`, over HTTPS, in the request URL as
+  the API requires; it is never logged, never written under `/data`, never put
+  in an error message.
+- **The location of the chosen Gladys house** (the manifest asks for
+  `location`) is rounded to two decimals (about 1 km) before being sent to
+  Weerlive. The other houses are never used.
+- **`/data`** holds `knmi-state.json`: the last weather reading of each place
+  and the last KNMI warning seen. No secret, no personal data beyond the place
+  names typed by the user.
+- **Network**: outgoing HTTPS requests to `weerlive.nl` only. The container
+  listens on no port.
+
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+and the Weerlive and KNMI services.
