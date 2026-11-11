@@ -31,7 +31,7 @@ people near the Belgian–Dutch border, and anyone with a house in the Netherlan
 
 ## Requirements
 
-- Gladys Assistant **5.2.0** or later (house picker, widgets, scene triggers).
+- Gladys Assistant **5.3.0** or later (catalog countries; 5.2.0 for house picker, widgets, scene triggers).
 - A free Weerlive API key, requested at [weerlive.nl/delen.php](https://weerlive.nl/delen.php)
   (an email address is enough). Weerlive reserves it for personal and hobby use.
 - Internet access for Gladys (`weerlive.nl`, HTTPS).
