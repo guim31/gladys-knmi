@@ -144,3 +144,8 @@ test('the manifest says the integration is not affiliated with KNMI nor Weerlive
   const intro = manifest.config_schema.find((field) => field.key === 'intro');
   assert.match(intro.description.en, /Not affiliated with KNMI or Weerlive/);
 });
+
+test('the catalog countries: the Netherlands, Belgium and France, which needs Gladys >= 5.3.0', () => {
+  assert.deepEqual(manifest.countries, ['NL', 'BE', 'FR']);
+  assert.ok(isAtLeast(minGladysVersion(), [5, 3, 0]), 'countries needs Gladys 5.3.0');
+});

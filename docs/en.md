@@ -26,7 +26,7 @@ This integration is not affiliated with KNMI nor with Weerlive.
 
 ## Prerequisites
 
-- Gladys Assistant **5.2.0** or later (house picker in the configuration, widgets, scene
+- Gladys Assistant **5.3.0** or later (catalog countries; 5.2.0 for house picker in the configuration, widgets, scene
   triggers).
 - A **free Weerlive API key**: fill in the form on
   [weerlive.nl/delen.php](https://weerlive.nl/delen.php) with your email address; the key arrives

@@ -27,7 +27,7 @@ Diese Integration hat keine Verbindung zu KNMI oder Weerlive.
 
 ## Voraussetzungen
 
-- Gladys Assistant **5.2.0** oder neuer (Hausauswahl in der Konfiguration, Widgets,
+- Gladys Assistant **5.3.0** oder neuer (Länder im Katalog; 5.2.0 für Hausauswahl in der Konfiguration, Widgets,
   Szenen-Auslöser).
 - Ein **kostenloser Weerlive-API-Schlüssel**: Fülle das Formular auf
   [weerlive.nl/delen.php](https://weerlive.nl/delen.php) mit deiner E-Mail-Adresse aus; der
